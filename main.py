@@ -100,35 +100,22 @@ class LinearRegression:
         :return: column vector, partial derivative for each dimension, bias included
         computes the gradient of the loss function with respect to the given w and bias
         Note that w and the bias are separate, they don't have to be contained
-        in the same vector
-        
-        to implement stochastic gradient descent we compute the gradient just with
-        respect to a single sample, or a subset
+        in the same vector.
         """
-        grad = []
-        # gradient with respect to weights
-        for j in range(self.dim):
-            summation = 0
-            for i in range(self.samples):
-                numerator = np.exp(-self.Y[i]*(self.predict(self.X[i], np.vstack((w,c)))))
-                denominator = 1 + numerator
-                numerator *= -self.Y[i] * (self.X[i][j])
-                summation += numerator / denominator
-            partial_derivative = (summation/self.samples) + self.lam * w[j]
-            grad.append(partial_derivative.item())
-        summation = 0
         
-        # gradient with respect to bias
+        grad_F = []  # full gradient matrix
         for i in range(self.samples):
-            numerator = np.exp(-self.Y[i]*(self.predict(self.X[i], np.vstack((w,c)))))
-            denominator = 1 + numerator
-            numerator *= -self.Y[i]
-            summation += numerator / denominator
-        partial_derivative = (summation/self.samples) + self.lam * c
-        grad.append(partial_derivative.item())
-        final_gradient = np.array(grad)  # we alredy added the second factor
-        final_gradient = final_gradient.reshape(self.dim+1, 1)
-        return final_gradient
+            common_numerator = np.exp(-self.Y[i]*(self.predict(self.X[i], np.vstack((w,c)))))
+            common_denominator = 1 + common_numerator
+            common_numerator *= -self.Y[i]
+            # can be done with just 1 for (iterating over samples), can be improved
+            grad_f = [(common_numerator * self.X[i][j])/common_denominator if j < self.dim else common_numerator/common_denominator for j in range(self.dim+1)]
+            grad_F.append(grad_f.copy())
+            grad_f.clear()
+        # add regularization term
+        grad_F = np.array(grad_F).T + self.lam * np.vstack((w, c))
+        # return mean
+        return np.mean(grad_F, axis=1, keepdims=True)
 
     def plot_loss(self):
         dict = {'loss': self.loss_history}
@@ -216,7 +203,7 @@ class LinearRegression:
 
 if __name__ == "__main__":
     # try toy data for a smaller dataset
-    dataset = "data.csv"
+    dataset = "toy.csv"
     df = pd.read_csv(dataset)
     data = read_input(df)
     ln = LinearRegression(data, beta=0.9, tol=0.01, sigma=0.01, s=1, lam=0.00001, ro_min=0.1, ro_max=2, m=10, sg=True)
