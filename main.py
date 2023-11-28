@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import random
 import time
 from collections import deque
+from termcolor import colored
 
 
 def read_input(df):
@@ -169,28 +170,46 @@ class LinearRegression:
         plt.scatter(df['x1'], df['x2'], marker="^", color="yellow")
         plt.show()
 
-    def sec_checks(self, settings):
+    def sec_checks(self, settings, extra_parameters):
         new_vars = settings
+        warn = False
+        for key, value in extra_parameters.items():
+            if key not in settings.keys():
+                print(colored("Warning: no initialization rule found for parameter {}.\n".format(key), "red"))
+                warn = True
+            new_vars[key] = value
+
+        # Write your custom parameter validation rules here
         if settings['stoc'] and (settings['arm'] or settings['bb']):
-            print("Warning: you enabled bot stoc gradient and full gradient options.")
-            print("Disabling full gradient and relative options for security purposes.")
-            time.sleep(2)
+            print(colored("Warning: you enabled bot stoc gradient and full gradient options.", 'red'))
+            print(colored("Disabling full gradient and relative options for security purposes.", 'red'))
             new_vars['arm'] = False
             new_vars['bb'] = False
+            warn = True
+
+
+        if not warn:
+            print(colored("No warnings found.\n"), 'green')
+        print("---------Parameters---------\n")
+        for key, value in new_vars.items():
+            print("{}:\t{}".format(key, value))
+        print("\n----------------------------\n")
+        input("Press any key to continue...\n")
         return new_vars
             
         
     # def fit(self, arm=False, bb=False, stoc=False):
-    def fit(self, settings):
-        
+    def fit(self, settings, **kwargs):
         """
         with stepest descent and without armijo it converges with around 1400 iterations,
         with barziali-borwein it converges with 700 iterations.
         """
-        cleaned_vars = self.sec_checks(settings)
-        arm = cleaned_vars['arm']
-        bb = cleaned_vars['bb']
-        stoc = cleaned_vars['stoc']
+        cv = self.sec_checks(settings, kwargs)
+        
+        arm = cv['arm']
+        bb = cv['bb']
+        stoc = cv['stoc']
+        
         self.stoc = stoc
         self.grad = self.gradient(self.w, self.c)
         k = 0
@@ -232,11 +251,19 @@ class LinearRegression:
         print("Iterations needed: {}".format(len(self.loss_history)))
 
 def initialize_settings():
+    """
+    Edit this function to initialize new parameters
+    needed for the fit function
+    """
     settings = {'arm': False,
                 'bb': False,
                 'stoc': False,
                 }
     return settings
+
+def fit_settings(**kwargs):
+    return kwargs
+
 if __name__ == "__main__":
     # try toy data for a smaller dataset
     settings = initialize_settings()
@@ -245,11 +272,6 @@ if __name__ == "__main__":
     data = read_input(df)
     ln = LinearRegression(data, beta=0.9, tol=0.001, sigma=0.01, s=0.01, lam=0.00001, ro_min=0.1, ro_max=2, m=10)
 
-    #need a better way to to this
-    settings['arm'] = True
-    settings['bb'] = True
-    settings['stoc'] = True
-    
-    ln.fit(settings)
+    ln.fit(settings, stoc=True, arm=True)
     ln.plot_loss()
     ln.plot_classifier()
