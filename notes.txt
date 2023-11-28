@@ -1,0 +1,14 @@
+SGD:
+currently works, only single sample is supported.
+Example of settings:
+------------------
+dataset = "data.csv"
+df = pd.read_csv(dataset)
+data = read_input(df)
+ln = LinearRegression(data, beta=0.9, tol=0.01, sigma=0.01, s=0.01, lam=0.000001, ro_min=0.1, ro_max=2, m=5, sg=True)
+ln.fit(arm=False, bb=False, stoc=True)
+ln.plot_loss()
+ln.plot_classifier()
+------------------
+Loss is not monotonic because gradient is local now, is not a
+global measure.
