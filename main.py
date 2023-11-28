@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import time
 from collections import deque
 
 
@@ -112,10 +113,15 @@ class LinearRegression:
             grad_f = [(common_numerator * self.X[i][j])/common_denominator if j < self.dim else common_numerator/common_denominator for j in range(self.dim+1)]
             grad_F.append(grad_f.copy())
             grad_f.clear()
+        grad_F = np.array(grad_F).T
         # add regularization term
-        grad_F = np.array(grad_F).T + self.lam * np.vstack((w, c))
+        if self.stoc:
+            random_column_index = np.random.choice(grad_F.shape[1])
+            final_gradient = grad_F[:, random_column_index].reshape(-1, 1)
+        else:
+            final_gradient = np.mean(grad_F, axis=1, keepdims=True)
         # return mean
-        return np.mean(grad_F, axis=1, keepdims=True)
+        return final_gradient + self.lam * np.vstack((w, c))
 
     def plot_loss(self):
         dict = {'loss': self.loss_history}
@@ -162,14 +168,35 @@ class LinearRegression:
         plt.scatter(bx, by, color="blue")
         plt.scatter(df['x1'], df['x2'], marker="^", color="yellow")
         plt.show()
+
+    def sec_checks(self, settings):
+        new_vars = settings
+        if settings['stoc'] and (settings['arm'] or settings['bb']):
+            print("Warning: you enabled bot stoc gradient and full gradient options.")
+            print("Disabling full gradient and relative options for security purposes.")
+            time.sleep(2)
+            new_vars['arm'] = False
+            new_vars['bb'] = False
+        return new_vars
+            
         
-    def fit(self, arm=True, bb=True):
+    # def fit(self, arm=False, bb=False, stoc=False):
+    def fit(self, settings):
+        
         """
         with stepest descent and without armijo it converges with around 1400 iterations,
         with barziali-borwein it converges with 700 iterations.
         """
+        cleaned_vars = self.sec_checks(settings)
+        arm = cleaned_vars['arm']
+        bb = cleaned_vars['bb']
+        stoc = cleaned_vars['stoc']
+        self.stoc = stoc
         self.grad = self.gradient(self.w, self.c)
+        k = 0
         while(np.linalg.norm(self.grad)) >= self.tol:  # termination rule
+            k += 1
+            print(k)
             self.grad = self.gradient(self.w, self.c)
             # print("gradient\n {}\n w \n {}\n c:{}".format(self.grad,self.w,self.c))
             s_current = np.vstack((self.w, self.c)) - np.vstack((self.w_pre, self.c_pre))  # col
@@ -187,6 +214,8 @@ class LinearRegression:
             if arm:
                 while self.loss(np.vstack((self.w, self.c)) + (alpha_current * d_current)).item() > max(self.M) + self.sigma*alpha_current*(self.grad.T @ d_current).item():
                     alpha_current *= self.beta
+            # if stoc and not arm:
+            #     alpha_current = 1/k
             w_next = self.w + (alpha_current * d_current[:-1])
             c_next = self.c + (alpha_current * d_current[-1].item())
             # current values become old values
@@ -196,17 +225,31 @@ class LinearRegression:
             self.w = w_next
             self.c = c_next
             loss = self.loss(np.vstack((self.w, self.c)))
-            print(loss)
+            grad_norm = np.linalg.norm(self.grad)
+            print("Loss: {} \t Grad norm: {}".format(loss, grad_norm))
             self.loss_history.append(loss)
-        print("process ended with gradient norm {}".format(np.linalg.norm(self.grad)))
+        print("process ended with gradient norm {}".format(grad_norm))
         print("Iterations needed: {}".format(len(self.loss_history)))
 
+def initialize_settings():
+    settings = {'arm': False,
+                'bb': False,
+                'stoc': False,
+                }
+    return settings
 if __name__ == "__main__":
     # try toy data for a smaller dataset
-    dataset = "toy.csv"
+    settings = initialize_settings()
+    dataset = "data.csv"
     df = pd.read_csv(dataset)
     data = read_input(df)
-    ln = LinearRegression(data, beta=0.9, tol=0.01, sigma=0.01, s=1, lam=0.00001, ro_min=0.1, ro_max=2, m=10, sg=True)
-    ln.fit(arm=True, bb=True)
+    ln = LinearRegression(data, beta=0.9, tol=0.001, sigma=0.01, s=0.01, lam=0.00001, ro_min=0.1, ro_max=2, m=10)
+
+    #need a better way to to this
+    settings['arm'] = True
+    settings['bb'] = True
+    settings['stoc'] = True
+    
+    ln.fit(settings)
     ln.plot_loss()
     ln.plot_classifier()
