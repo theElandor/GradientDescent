@@ -132,6 +132,7 @@ class LinearRegression:
         plt.xlabel("Iterations")
         plt.ylabel("Loss")
         plt.title("Logistic Loss")
+        plt.savefig("loss.png")
         plt.show()
 
     def plot_classifier(self):
@@ -168,6 +169,7 @@ class LinearRegression:
         plt.scatter(rx, ry, color="red")
         plt.scatter(bx, by, color="blue")
         plt.scatter(df['x1'], df['x2'], marker="^", color="yellow")
+        plt.savefig("boundary.png")        
         plt.show()
 
     def sec_checks(self, settings, extra_parameters):
@@ -186,13 +188,24 @@ class LinearRegression:
             new_vars['arm'] = False
             new_vars['bb'] = False
             warn = True
-
-
+        if settings['momentum']:
+            if not settings['stoc']:
+                print(colored("Warning: you enabled momentum without stochastic gradient. Enabling stochastic gradient.\n","red"))
+                new_vars['stoc'] = True
+            if 'lr' not in settings.keys() or not settings['lr']:
+                print(colored("Warning: momentum requires a fixed learning rate (steplenght). Use the lr parameter to specify one.", "red"))
+                print(colored("Setting learning rate to default value 10^-5\n","yellow"))
+            if 'discount' not in settings.keys() or not settings['discount']:
+                print(colored("Warning: momentum requires a discount rate(beta). Use the discount parameter to provide one.", "red"))
+                print(colored("Setting discount value (beta) to default value 0.8\n","yellow"))
+        new_vars['discount'] = 0.8
+        new_vars['lr'] = 0.01
+            
         if not warn:
             print(colored("No warnings found.\n"), 'green')
         print("---------Parameters---------\n")
         for key, value in new_vars.items():
-            print("{}:\t{}".format(key, value))
+            print("{}:{}".format(key, value))
         print("\n----------------------------\n")
         input("Press any key to continue...\n")
         return new_vars
@@ -209,14 +222,19 @@ class LinearRegression:
         arm = cv['arm']
         bb = cv['bb']
         stoc = cv['stoc']
+        lr = cv['lr']
+        discount = cv['discount']
+        momentum = cv['momentum']
         
         self.stoc = stoc
         self.grad = self.gradient(self.w, self.c)
         k = 0
+        momentum_memory = 0
         while(np.linalg.norm(self.grad)) >= self.tol:  # termination rule
             k += 1
             print(k)
             self.grad = self.gradient(self.w, self.c)
+            momentum_memory = momentum_memory * discount + self.grad
             # print("gradient\n {}\n w \n {}\n c:{}".format(self.grad,self.w,self.c))
             s_current = np.vstack((self.w, self.c)) - np.vstack((self.w_pre, self.c_pre))  # col
             y_current = self.grad - self.gradient(self.w_pre, self.c_pre)  # col
@@ -233,10 +251,16 @@ class LinearRegression:
             if arm:
                 while self.loss(np.vstack((self.w, self.c)) + (alpha_current * d_current)).item() > max(self.M) + self.sigma*alpha_current*(self.grad.T @ d_current).item():
                     alpha_current *= self.beta
+            if stoc and momentum:
+                alpha_current = lr
             # if stoc and not arm:
             #     alpha_current = 1/k
-            w_next = self.w + (alpha_current * d_current[:-1])
-            c_next = self.c + (alpha_current * d_current[-1].item())
+            if stoc and momentum:
+                w_next = self.w - (alpha_current * momentum_memory[:-1])
+                c_next = self.c - (alpha_current * momentum_memory[-1].item())
+            else:
+                w_next = self.w + (alpha_current * d_current[:-1])
+                c_next = self.c + (alpha_current * d_current[-1].item())
             # current values become old values
             self.w_pre = self.w
             self.c_pre = self.c
@@ -258,6 +282,7 @@ def initialize_settings():
     settings = {'arm': False,
                 'bb': False,
                 'stoc': False,
+                'momentum': False,
                 }
     return settings
 
@@ -272,6 +297,6 @@ if __name__ == "__main__":
     data = read_input(df)
     ln = LinearRegression(data, beta=0.9, tol=0.001, sigma=0.01, s=0.01, lam=0.00001, ro_min=0.1, ro_max=2, m=10)
 
-    ln.fit(settings, stoc=True, arm=True)
+    ln.fit(settings, stoc=True, momentum=True)
     ln.plot_loss()
     ln.plot_classifier()
