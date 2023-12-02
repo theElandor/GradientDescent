@@ -12,3 +12,7 @@ ln.plot_classifier()
 ------------------
 Loss is not monotonic because gradient is local now, is not a
 global measure.
+------------------
+
+SGD with momentum:
+apparently momentum speeds up a lot the gradient descent (250 iterations vs around 2000 with standard SG)
